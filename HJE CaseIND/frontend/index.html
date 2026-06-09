@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PulseCheck — Painel de Monitoramento</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #eef2f7;
+      color: #1e293b;
+      min-height: 100vh;
+    }
+
+    /* ── Topbar ─────────────────────────────────────────────────────── */
+    .topbar {
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+    .topbar-logo {
+      font-size: 17px; font-weight: 700; color: #2563eb;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .topbar-logo svg { width: 20px; height: 20px; }
+    .topbar-sub  { font-size: 13px; color: #64748b; }
+    .topbar-clock { font-size: 13px; color: #64748b; font-variant-numeric: tabular-nums; }
+
+    /* ── Layout principal (tabela + drawer) ─────────────────────────── */
+    .page-body {
+      display: flex;
+      gap: 0;
+      min-height: calc(100vh - 52px);
+      transition: all .3s ease;
+    }
+
+    .main-col {
+      flex: 1;
+      min-width: 0;
+      padding: 24px 20px 60px;
+      transition: all .3s ease;
+    }
+
+    /* ── Drawer lateral (histórico) ─────────────────────────────────── */
+    .drawer {
+      width: 0;
+      overflow: hidden;
+      background: white;
+      border-left: 1px solid #e2e8f0;
+      transition: width .3s ease;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .drawer.open {
+      width: 400px;
+    }
+    .drawer-inner {
+      width: 400px;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    /* Header do drawer */
+    .drawer-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .drawer-header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .drawer-nome {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1e293b;
+      line-height: 1.3;
+    }
+    .drawer-id {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .drawer-close {
+      background: none;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      width: 30px;
+      height: 30px;
+      font-size: 16px;
+      color: #64748b;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: .15s;
+    }
+    .drawer-close:hover { background: #f1f5f9; color: #1e293b; }
+
+    /* Stats rápidos no drawer */
+    .drawer-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+    .drawer-stat {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .drawer-stat-label {
+      font-size: 10px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 3px;
+    }
+    .drawer-stat-val {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .drawer-stat-val.green { color: #16a34a; }
+    .drawer-stat-val.red   { color: #dc2626; }
+    .drawer-stat-val.blue  { color: #2563eb; }
+
+    /* Botão de acompanhamento no drawer */
+    .drawer-action-btn {
+      width: 100%;
+      padding: 10px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: .15s;
+    }
+    .drawer-action-btn:hover { background: #1d4ed8; }
+    .drawer-action-btn:disabled { background: #93c5fd; cursor: not-allowed; }
+    .drawer-action-btn.done {
+      background: #f0fdf4;
+      color: #16a34a;
+      border: 1px solid #bbf7d0;
+    }
+
+    /* Histórico de medições */
+    .drawer-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #64748b;
+      padding: 16px 20px 8px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .medicao-list { padding: 8px 20px 20px; }
+
+    .medicao-item {
+      display: flex;
+      align-items: stretch;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+      animation: fadeUp .2s ease both;
+    }
+    .medicao-item:last-child { border-bottom: none; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Linha de tempo vertical */
+    .medicao-timeline {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      padding-top: 3px;
+    }
+    .timeline-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .timeline-dot.normal    { background: #16a34a; }
+    .timeline-dot.irregular { background: #dc2626; }
+    .timeline-dot.semdata   { background: #94a3b8; }
+    .timeline-line {
+      width: 2px;
+      flex: 1;
+      background: #e2e8f0;
+      margin-top: 4px;
+    }
+    .medicao-item:last-child .timeline-line { display: none; }
+
+    /* Card da medição */
+    .medicao-card {
+      flex: 1;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 4px;
+    }
+    .medicao-card.irregular {
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+    .medicao-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .medicao-data {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+    .medicao-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 100px;
+    }
+    .medicao-badge.normal    { background: #f0fdf4; color: #16a34a; }
+    .medicao-badge.irregular { background: #fef2f2; color: #dc2626; }
+    .medicao-badge.semdata   { background: #f8fafc; color: #64748b; }
+
+    /* Métricas da medição */
+    .medicao-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .medicao-metric {
+      display: flex;
+      flex-direction: column;
+    }
+    .metric-label {
+      font-size: 9px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .metric-val {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .metric-val.danger { color: #dc2626; }
+    .metric-val.ok     { color: #16a34a; }
+
+    /* Barra de confiança */
+    .confianca-bar-wrap {
+      margin-top: 8px;
+    }
+    .confianca-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: #94a3b8;
+      margin-bottom: 3px;
+    }
+    .confianca-bar {
+      height: 4px;
+      background: #e2e8f0;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .confianca-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width .6s ease;
+    }
+    .confianca-fill.ok     { background: #16a34a; }
+    .confianca-fill.warn   { background: #d97706; }
+    .confianca-fill.danger { background: #dc2626; }
+
+    /* Empty state do drawer */
+    .drawer-empty {
+      padding: 32px 20px;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 13px;
+    }
+
+    /* ── Summary cards ───────────────────────────────────────────────── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .summary-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+    .summary-card .card-label {
+      font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .07em;
+      color: #64748b; margin-bottom: 8px;
+    }
+    .summary-card .card-value { font-size: 30px; font-weight: 700; line-height: 1; }
+    .summary-card .card-sub   { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    .val-blue  { color: #2563eb; }
+    .val-green { color: #16a34a; }
+    .val-red   { color: #dc2626; }
+
+    /* ── Table section card ──────────────────────────────────────────── */
+    .section-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 18px;
+    }
+    .section-title {
+      font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .07em;
+      color: #64748b;
+      padding: 12px 20px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    /* ── Toolbar ─────────────────────────────────────────────────────── */
+    .toolbar {
+      display: flex; align-items: center; gap: 8px;
+      flex-wrap: wrap;
+      padding: 14px 20px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .filter-btn {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 13px; font-weight: 500;
+      padding: 6px 16px; border-radius: 100px;
+      border: 1px solid #cbd5e1;
+      background: white; color: #64748b;
+      cursor: pointer; transition: .15s;
+    }
+    .filter-btn:hover { background: #f1f5f9; }
+    .filter-btn.active { background: #2563eb; border-color: #2563eb; color: white; }
+    .toolbar-spacer { flex: 1; }
+    .refresh-btn {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 13px; font-weight: 500;
+      padding: 6px 14px; border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: white; color: #64748b;
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+      transition: .15s;
+    }
+    .refresh-btn:hover { background: #f1f5f9; }
+    .refresh-icon { transition: transform .5s ease; }
+    .refresh-btn.spinning .refresh-icon { transform: rotate(360deg); }
+
+    /* ── Table ───────────────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em;
+      color: #64748b; padding: 12px 20px;
+      text-align: left; background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    tbody tr {
+      border-bottom: 1px solid #f1f5f9;
+      transition: background .1s;
+      cursor: pointer;
+      animation: rowIn .2s ease both;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f0f9ff; }
+    tbody tr.selected { background: #eff6ff; border-left: 3px solid #2563eb; }
+
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateY(3px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    tbody td { padding: 14px 20px; font-size: 14px; vertical-align: middle; }
+
+    tr.urgency { background: #fef2f2; border-left: 3px solid #dc2626; }
+    tr.urgency:hover { background: #fee2e2; }
+    tr.urgency.selected { background: #ffe4e6; border-left: 3px solid #dc2626; }
+
+    /* ── Patient name cell ───────────────────────────────────────────── */
+    .nome-cell { font-weight: 600; }
+    .nome-cell small {
+      display: block; font-size: 12px; color: #94a3b8;
+      font-weight: 400; margin-top: 1px;
+    }
+
+    /* Ícone de "clicável" */
+    .click-hint {
+      font-size: 11px; color: #cbd5e1;
+      margin-left: 6px; transition: color .15s;
+    }
+    tr:hover .click-hint { color: #2563eb; }
+
+    /* ── Badges ──────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 600;
+      padding: 4px 10px; border-radius: 100px;
+    }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .badge.normal    { background: #f0fdf4; color: #166534; }
+    .badge.normal    .badge-dot { background: #16a34a; }
+    .badge.irregular { background: #fef2f2; color: #991b1b; }
+    .badge.irregular .badge-dot { background: #dc2626; animation: pulse 1.4s ease infinite; }
+    .badge.semdata   { background: #f8fafc; color: #64748b; }
+    .badge.semdata   .badge-dot { background: #94a3b8; }
+
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:.4; transform:scale(1.3); }
+    }
+
+    .tempo { font-size: 13px; color: #64748b; }
+    .tempo.urgent { color: #dc2626; font-weight: 600; }
+    .data-cell { font-size: 13px; color: #64748b; }
+
+    /* ── Action button ───────────────────────────────────────────────── */
+    .btn-acao {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 13px; font-weight: 500;
+      padding: 7px 14px; border-radius: 8px;
+      border: 1px solid #cbd5e1; background: white; color: #1e293b;
+      cursor: pointer; transition: .15s; white-space: nowrap;
+    }
+    .btn-acao:hover:not(:disabled) { background: #2563eb; border-color: #2563eb; color: white; }
+    .btn-acao:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-acao.done { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+
+    /* ── Empty ───────────────────────────────────────────────────────── */
+    .empty { text-align: center; padding: 48px 20px; color: #94a3b8; font-size: 14px; }
+
+    /* ── Status bar ──────────────────────────────────────────────────── */
+    .status-bar { display: none; padding: 12px 18px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; font-weight: 600; }
+    .status-bar.show { display: block; }
+    .status-bar.success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .status-bar.error   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+    /* ── Modal ───────────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(15,23,42,.5);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; animation: fadeIn .15s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    .modal {
+      background: white; border: 1px solid #e2e8f0; border-radius: 16px;
+      padding: 28px 32px; width: 420px; max-width: 92vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,.15); animation: slideUp .2s ease;
+    }
+    @keyframes slideUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    .modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .modal p  { font-size: 14px; color: #64748b; margin-bottom: 20px; }
+    .modal label { font-size: 13px; font-weight: 600; color: #334155; display: block; margin-bottom: 6px; }
+    .modal input {
+      width: 100%; padding: 10px 14px;
+      border: 1px solid #cbd5e1; border-radius: 8px;
+      font-size: 14px; font-family: inherit; color: #1e293b; transition: .15s;
+    }
+    .modal input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .modal-btns { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+    .btn-cancel {
+      font-family: inherit; font-size: 14px; font-weight: 500;
+      padding: 10px 20px; border-radius: 8px; border: 1px solid #cbd5e1;
+      background: white; color: #64748b; cursor: pointer; transition: .15s;
+    }
+    .btn-cancel:hover { background: #f8fafc; }
+    .btn-confirm {
+      font-family: inherit; font-size: 14px; font-weight: 600;
+      padding: 10px 20px; border-radius: 8px; border: none;
+      background: #2563eb; color: white; cursor: pointer; transition: .15s;
+    }
+    .btn-confirm:hover { background: #1d4ed8; }
+
+    /* ── Skeleton ────────────────────────────────────────────────────── */
+    .skeleton {
+      display: inline-block;
+      background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 4px;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    /* ── Responsive ──────────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .drawer.open { position: fixed; right: 0; top: 52px; bottom: 0; width: 100% !important; max-width: 400px; z-index: 50; box-shadow: -4px 0 20px rgba(0,0,0,.12); }
+    }
+    @media (max-width: 768px) {
+      .summary-grid { grid-template-columns: repeat(2,1fr); }
+      .th-data, .td-data { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Topbar ──────────────────────────────────────────────────────────── -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round">
+        <polyline points="2 12 6 12 8 4 10 20 12 10 14 14 16 12 22 12"/>
+      </svg>
+      PulseCheck
+    </span>
+    <span class="topbar-sub">— Painel Interno de Monitoramento</span>
+  </div>
+  <span class="topbar-clock" id="clock">--:--:--</span>
+</div>
+
+<!-- ── Page body (tabela + drawer) ────────────────────────────────────── -->
+<div class="page-body">
+
+  <!-- Coluna principal -->
+  <div class="main-col">
+
+    <div class="page-header" style="margin-bottom:24px">
+      <h1 style="font-size:22px;font-weight:700;margin-bottom:4px">Monitoramento de usuários</h1>
+      <p style="font-size:14px;color:#64748b">Clique em qualquer linha para ver o histórico de medições do paciente.</p>
+    </div>
+
+    <div class="status-bar" id="statusBar"></div>
+
+    <!-- Summary cards -->
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="card-label">Total</div>
+        <div class="card-value val-blue" id="stat-total"><span class="skeleton" style="width:32px;height:30px"></span></div>
+        <div class="card-sub">usuários ativos</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">Normal</div>
+        <div class="card-value val-green" id="stat-normal"><span class="skeleton" style="width:24px;height:30px"></span></div>
+        <div class="card-sub">última medição</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">Irregular</div>
+        <div class="card-value val-red" id="stat-irregular"><span class="skeleton" style="width:24px;height:30px"></span></div>
+        <div class="card-sub">requerem atenção</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">Urgência</div>
+        <div class="card-value val-red" id="stat-urgency"><span class="skeleton" style="width:24px;height:30px"></span></div>
+        <div class="card-sub">&gt;24h sem revisão</div>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="section-card">
+      <div class="section-title">❤️ Sessões de monitoramento</div>
+      <div class="toolbar">
+        <button class="filter-btn active" data-filter="todos">Todos</button>
+        <button class="filter-btn" data-filter="Normal">Normal</button>
+        <button class="filter-btn" data-filter="Irregular">Irregular</button>
+        <button class="filter-btn" data-filter="Sem dados">Sem dados</button>
+        <div class="toolbar-spacer"></div>
+        <button class="refresh-btn" id="refreshBtn">
+          <svg class="refresh-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          Atualizar
+        </button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Paciente</th>
+            <th class="th-data">Última medição</th>
+            <th>Resultado</th>
+            <th>Tempo decorrido</th>
+            <th>Acompanhamento</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+  </div><!-- /main-col -->
+
+  <!-- ── Drawer lateral ──────────────────────────────────────────────── -->
+  <div class="drawer" id="drawer">
+    <div class="drawer-inner">
+
+      <div class="drawer-header">
+        <div class="drawer-header-top">
+          <div>
+            <div class="drawer-nome" id="drawerNome">—</div>
+            <div class="drawer-id"   id="drawerIdLabel">—</div>
+          </div>
+          <button class="drawer-close" id="drawerClose" title="Fechar">✕</button>
+        </div>
+
+        <!-- Stats rápidos -->
+        <div class="drawer-stats">
+          <div class="drawer-stat">
+            <div class="drawer-stat-label">Resultado</div>
+            <div class="drawer-stat-val" id="dStatResultado">—</div>
+          </div>
+          <div class="drawer-stat">
+            <div class="drawer-stat-label">Medições</div>
+            <div class="drawer-stat-val blue" id="dStatMedicoes">—</div>
+          </div>
+          <div class="drawer-stat">
+            <div class="drawer-stat-label">Último BPM</div>
+            <div class="drawer-stat-val" id="dStatBpm">—</div>
+          </div>
+        </div>
+
+        <button class="drawer-action-btn" id="drawerAcompBtn">Registrar revisão</button>
+      </div>
+
+      <!-- Lista de medições -->
+      <div class="drawer-section-title">Histórico de medições</div>
+      <div class="medicao-list" id="medicaoList">
+        <div class="drawer-empty">Selecione um paciente para ver o histórico.</div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /page-body -->
+
+<!-- ── Modal de acompanhamento ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="modalOverlay" style="display:none">
+  <div class="modal">
+    <h3>Registrar acompanhamento</h3>
+    <p id="modalDesc">Confirme que o caso foi revisado pela equipe clínica.</p>
+    <label for="operadorInput">Nome do operador <span style="color:#dc2626">*</span></label>
+    <input type="text" id="operadorInput" placeholder="ex: Dr. Silva" autocomplete="off" />
+    <div class="modal-btns">
+      <button class="btn-cancel" id="modalCancel">Cancelar</button>
+      <button class="btn-confirm" id="modalConfirm">💾 Confirmar revisão</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = "http://localhost:5000";
+
+const state = {
+  usuarios:       [],
+  filtroAtivo:    "todos",
+  selectedId:     null,
+  historico:      {},   // cache: id -> array
+};
+
+// ── Utilitários ──────────────────────────────────────────────────────────
+
+function formatarTempo(min) {
+  if (min === null || min === undefined) return "—";
+  if (min < 60)   return `${min}min`;
+  if (min < 1440) return `${Math.round(min / 60)}h`;
+  return `${Math.floor(min / 1440)}d ${Math.round((min % 1440) / 60)}h`;
+}
+
+function formatarData(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit"
+  });
+}
+
+function isUrgente(u) {
+  return u.resultado === "Irregular" && !u.acompanhamento_registrado &&
+         u.tempo_decorrido_min !== null && u.tempo_decorrido_min > 1440;
+}
+
+function badgeClass(r) {
+  return { "Normal": "normal", "Irregular": "irregular", "Sem dados": "semdata" }[r] || "semdata";
+}
+
+function confiancaClass(v) {
+  if (v >= 0.85) return "ok";
+  if (v >= 0.6)  return "warn";
+  return "danger";
+}
+
+// ── Status bar ───────────────────────────────────────────────────────────
+
+function setStatus(tipo, msg) {
+  const bar = document.getElementById("statusBar");
+  bar.className = `status-bar show ${tipo}`;
+  bar.textContent = msg;
+  setTimeout(() => bar.classList.remove("show"), 4000);
+}
+
+// ── API ──────────────────────────────────────────────────────────────────
+
+async function fetchUsuarios() {
+  const res = await fetch(`${API_BASE}/usuarios`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function fetchHistorico(id) {
+  if (state.historico[id]) return state.historico[id];
+  const res = await fetch(`${API_BASE}/usuarios/${id}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  state.historico[id] = data.historico;
+  return data.historico;
+}
+
+async function postAcompanhamento(id, operador) {
+  const res = await fetch(`${API_BASE}/usuarios/${id}/acompanhamento`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operador })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.erro || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── Render tabela ────────────────────────────────────────────────────────
+
+function renderStats(lista) {
+  document.getElementById("stat-total").textContent    = lista.length;
+  document.getElementById("stat-normal").textContent   = lista.filter(u => u.resultado === "Normal").length;
+  document.getElementById("stat-irregular").textContent = lista.filter(u => u.resultado === "Irregular").length;
+  document.getElementById("stat-urgency").textContent  = lista.filter(u => isUrgente(u)).length;
+}
+
+function renderTabela() {
+  const lista = state.filtroAtivo === "todos"
+    ? state.usuarios
+    : state.usuarios.filter(u => u.resultado === state.filtroAtivo);
+
+  const tbody = document.getElementById("tbody");
+
+  if (lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty">Nenhum usuário encontrado.</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map((u, i) => {
+    const urgente  = isUrgente(u);
+    const badge    = badgeClass(u.resultado);
+    const selected = u.id === state.selectedId ? "selected" : "";
+    const btnLabel = u.acompanhamento_registrado ? "✅ Revisado" : "Registrar revisão";
+    const btnClass = u.acompanhamento_registrado ? "btn-acao done" : "btn-acao";
+    const disabled = (u.resultado !== "Irregular" || u.acompanhamento_registrado) ? "disabled" : "";
+
+    return `
+      <tr class="${urgente ? "urgency" : ""} ${selected}"
+          style="animation-delay:${i * 25}ms"
+          onclick="selecionarPaciente(${u.id})">
+        <td>
+          <div class="nome-cell">
+            ${u.nome} <span class="click-hint">›</span>
+            <small>ID #${u.id}</small>
+          </div>
+        </td>
+        <td class="td-data data-cell">${formatarData(u.ultima_medicao)}</td>
+        <td>
+          <span class="badge ${badge}">
+            <span class="badge-dot"></span>
+            ${u.resultado}
+          </span>
+        </td>
+        <td>
+          <span class="tempo ${urgente ? "urgent" : ""}">
+            ${formatarTempo(u.tempo_decorrido_min)}${urgente ? " ⚠️" : ""}
+          </span>
+        </td>
+        <td onclick="event.stopPropagation()">
+          <button class="${btnClass}" ${disabled}
+            onclick="abrirModal(${u.id}, '${u.nome.replace(/'/g,"\\'")}')">
+            ${btnLabel}
+          </button>
+        </td>
+      </tr>`;
+  }).join("");
+}
+
+// ── Drawer ───────────────────────────────────────────────────────────────
+
+async function selecionarPaciente(id) {
+  // Toggle: clica no mesmo fecha
+  if (state.selectedId === id) {
+    fecharDrawer();
+    return;
+  }
+
+  state.selectedId = id;
+  renderTabela(); // atualiza linha selecionada
+
+  const usuario = state.usuarios.find(u => u.id === id);
+  if (!usuario) return;
+
+  // Abre drawer com loading
+  document.getElementById("drawer").classList.add("open");
+  document.getElementById("drawerNome").textContent   = usuario.nome;
+  document.getElementById("drawerIdLabel").textContent = `ID #${id}  ·  Última medição: ${formatarData(usuario.ultima_medicao)}`;
+
+  // Stats rápidos
+  const dRes = document.getElementById("dStatResultado");
+  dRes.textContent  = usuario.resultado;
+  dRes.className    = "drawer-stat-val " + (usuario.resultado === "Normal" ? "green" : usuario.resultado === "Irregular" ? "red" : "");
+  document.getElementById("dStatMedicoes").textContent = "…";
+  document.getElementById("dStatBpm").textContent      = "…";
+
+  // Botão de acompanhamento
+  const btn = document.getElementById("drawerAcompBtn");
+  if (usuario.resultado !== "Irregular" || usuario.acompanhamento_registrado) {
+    btn.disabled    = true;
+    btn.textContent = usuario.acompanhamento_registrado ? "✅ Já revisado" : "Sem alerta pendente";
+    btn.className   = "drawer-action-btn done";
+  } else {
+    btn.disabled    = false;
+    btn.textContent = "Registrar revisão";
+    btn.className   = "drawer-action-btn";
+    btn.onclick     = () => abrirModal(id, usuario.nome);
+  }
+
+  // Loading estado da lista
+  document.getElementById("medicaoList").innerHTML =
+    `<div class="drawer-empty">Carregando histórico...</div>`;
+
+  try {
+    const historico = await fetchHistorico(id);
+    document.getElementById("dStatMedicoes").textContent = historico.length || "0";
+
+    if (historico.length > 0) {
+      const lastBpm = historico[0]?.bpm;
+      const bpmEl = document.getElementById("dStatBpm");
+      bpmEl.textContent = lastBpm ? `${lastBpm} bpm` : "—";
+      bpmEl.className   = "drawer-stat-val " + (lastBpm > 120 ? "red" : lastBpm < 50 ? "red" : "green");
+    } else {
+      document.getElementById("dStatBpm").textContent = "—";
+    }
+
+    renderHistorico(historico);
+  } catch (err) {
+    document.getElementById("medicaoList").innerHTML =
+      `<div class="drawer-empty">Erro ao carregar: ${err.message}</div>`;
+  }
+}
+
+function fecharDrawer() {
+  state.selectedId = null;
+  document.getElementById("drawer").classList.remove("open");
+  renderTabela();
+}
+
+function renderHistorico(historico) {
+  const list = document.getElementById("medicaoList");
+
+  if (!historico || historico.length === 0) {
+    list.innerHTML = `<div class="drawer-empty">Nenhuma medição registrada para este usuário.</div>`;
+    return;
+  }
+
+  list.innerHTML = historico.map((m, i) => {
+    const bc  = badgeClass(m.resultado);
+    const pct = Math.round(m.confianca * 100);
+    const cc  = confiancaClass(m.confianca);
+    const bpmOk = m.bpm >= 50 && m.bpm <= 100;
+
+    return `
+      <div class="medicao-item" style="animation-delay:${i * 40}ms">
+        <div class="medicao-timeline">
+          <div class="timeline-dot ${bc}"></div>
+          <div class="timeline-line"></div>
+        </div>
+        <div class="medicao-card ${bc}" style="margin-bottom:${i < historico.length-1 ? 8 : 0}px">
+          <div class="medicao-card-top">
+            <span class="medicao-data">${formatarData(m.timestamp)}</span>
+            <span class="medicao-badge ${bc}">
+              <span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block"></span>
+              ${m.resultado}
+            </span>
+          </div>
+          <div class="medicao-metrics">
+            <div class="medicao-metric">
+              <span class="metric-label">Frequência cardíaca</span>
+              <span class="metric-val ${bpmOk ? "ok" : "danger"}">${m.bpm} <span style="font-size:11px;font-weight:400;color:#94a3b8">bpm</span></span>
+            </div>
+            <div class="medicao-metric">
+              <span class="metric-label">Confiança do modelo</span>
+              <span class="metric-val ${cc}">${pct}<span style="font-size:11px;font-weight:400;color:#94a3b8">%</span></span>
+            </div>
+          </div>
+          <div class="confianca-bar-wrap">
+            <div class="confianca-label-row">
+              <span>Confiança da IA</span>
+              <span>${pct}%</span>
+            </div>
+            <div class="confianca-bar">
+              <div class="confianca-fill ${cc}" style="width:${pct}%"></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+// ── Carregar dados ───────────────────────────────────────────────────────
+
+async function carregarDados() {
+  const btn = document.getElementById("refreshBtn");
+  btn.classList.add("spinning");
+  try {
+    state.usuarios = await fetchUsuarios();
+    state.historico = {}; // invalida cache
+    renderStats(state.usuarios);
+    renderTabela();
+
+    // Se havia paciente selecionado, recarrega o drawer
+    if (state.selectedId) {
+      const ainda = state.usuarios.find(u => u.id === state.selectedId);
+      if (ainda) selecionarPaciente(state.selectedId);
+      else fecharDrawer();
+    }
+  } catch (err) {
+    setStatus("error", "❌ Erro ao conectar ao backend. Verifique se o servidor está rodando.");
+    document.getElementById("tbody").innerHTML =
+      `<tr><td colspan="5"><div class="empty">Falha ao carregar: ${err.message}</div></td></tr>`;
+  } finally {
+    btn.classList.remove("spinning");
+  }
+}
+
+// ── Filtros ──────────────────────────────────────────────────────────────
+
+document.querySelectorAll(".filter-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    state.filtroAtivo = btn.dataset.filter;
+    renderTabela();
+  });
+});
+
+document.getElementById("refreshBtn").addEventListener("click", carregarDados);
+document.getElementById("drawerClose").addEventListener("click", fecharDrawer);
+
+// ── Relógio ──────────────────────────────────────────────────────────────
+
+function atualizarRelogio() {
+  document.getElementById("clock").textContent = new Date().toLocaleTimeString("pt-BR");
+}
+setInterval(atualizarRelogio, 1000);
+atualizarRelogio();
+
+// ── Modal ────────────────────────────────────────────────────────────────
+
+let _modalId = null, _modalNome = null;
+
+function abrirModal(id, nome) {
+  _modalId = id; _modalNome = nome;
+  document.getElementById("modalDesc").textContent =
+    `Confirme a revisão do caso de ${nome}. Será registrado no log de auditoria.`;
+  document.getElementById("operadorInput").value = "";
+  document.getElementById("operadorInput").style.borderColor = "";
+  document.getElementById("modalOverlay").style.display = "flex";
+  setTimeout(() => document.getElementById("operadorInput").focus(), 80);
+}
+
+document.getElementById("modalCancel").addEventListener("click", () => {
+  document.getElementById("modalOverlay").style.display = "none";
+});
+document.getElementById("modalOverlay").addEventListener("click", e => {
+  if (e.target === document.getElementById("modalOverlay"))
+    document.getElementById("modalOverlay").style.display = "none";
+});
+document.getElementById("modalConfirm").addEventListener("click", async () => {
+  const operador = document.getElementById("operadorInput").value.trim();
+  if (!operador) {
+    document.getElementById("operadorInput").style.borderColor = "#dc2626";
+    return;
+  }
+  document.getElementById("modalOverlay").style.display = "none";
+
+  try {
+    await postAcompanhamento(_modalId, operador);
+    const u = state.usuarios.find(x => x.id === _modalId);
+    if (u) u.acompanhamento_registrado = true;
+    renderTabela();
+    setStatus("success", `✅ Acompanhamento de ${_modalNome} registrado.`);
+
+    // Atualiza botão no drawer se estiver aberto para o mesmo paciente
+    if (state.selectedId === _modalId) selecionarPaciente(_modalId);
+  } catch (err) {
+    setStatus("error", `❌ Erro: ${err.message}`);
+  }
+});
+document.getElementById("operadorInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("modalConfirm").click();
+});
+
+// ── Init ─────────────────────────────────────────────────────────────────
+carregarDados();
+</script>
+</body>
+</html>
